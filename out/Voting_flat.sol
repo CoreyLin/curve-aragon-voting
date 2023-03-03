@@ -54,6 +54,7 @@ library UnstructuredStorage {
         assembly { data := sload(position) }
     }
 
+    // 以太坊开发人员可以直接在Solidity中使用assembly来提高代码的性能。当OpenSea发布Seaport升级版时，该公司报告称，使用assembly将gas费降低了35%，每年为用户节省了约4.6亿美元。
     function setStorageBool(bytes32 position, bool data) internal {
         assembly { sstore(position, data) }
     }
@@ -87,6 +88,8 @@ contract TimeHelpers {
     *      Using a function rather than `block.number` allows us to easily mock the block number in
     *      tests.
     */
+    // 返回当前区块号。
+    // 使用一个function而不是直接使用block.number的原因是允许我们在测试中轻松模拟区块号。
     function getBlockNumber() internal view returns (uint256) {
         return block.number;
     }
@@ -96,6 +99,7 @@ contract TimeHelpers {
     *      Using a function rather than `block.number` allows us to easily mock the block number in
     *      tests.
     */
+    // 返回当前区块号，并转换为uint64类型。
     function getBlockNumber64() internal view returns (uint64) {
         return getBlockNumber().toUint64();
     }
@@ -698,8 +702,12 @@ contract Initializable is TimeHelpers {
 
     /**
     * @dev Function to be called by top level contract after initialization has finished.
+    * 在初始化完成后由顶级合约调用的函数
     */
+    // 初始化初始区块号
     function initialized() internal onlyInit {
+        // setStorageUint256是library UnstructuredStorage中的方法
+        // 把当前区块号通过sstore存储到INITIALIZATION_BLOCK_POSITION
         INITIALIZATION_BLOCK_POSITION.setStorageUint256(getBlockNumber());
     }
 
@@ -890,7 +898,7 @@ contract EVMScriptRunner is AppStorage, Initializable, EVMScriptRegistryConstant
         return IEVMScriptRegistry(registryAddr);
     }
 
-    function runScript(bytes _script, bytes _input, address[] _blacklist)
+    function runScript(bytes _script, bytes _input, address[] _blacklist)//TODO: 此方案很核心，值得细看
         internal
         isInitialized
         protectState
@@ -1252,6 +1260,7 @@ contract ApproveAndCallFallBack {
 /// @dev The actual token contract, the default controller is the msg.sender
 ///  that deploys the contract, so usually this token will be deployed by a
 ///  token controller contract, which Giveth will call a "Campaign"
+// @dev 实际的代币合约，默认的控制器是部署这个合约的msg.sender，因此，通常这个代币合约将由一个代币控制器合约部署，Giveth将其称为“Campaign”
 contract MiniMeToken is Controlled {
 
     string public name;                //The Token's name: e.g. DigixDAO Tokens
@@ -1263,6 +1272,7 @@ contract MiniMeToken is Controlled {
     /// @dev `Checkpoint` is the structure that attaches a block number to a
     ///  given value, the block number attached is the one that last changed the
     ///  value
+    // @dev Checkpoint是将区块号附加到给定值的struct，所附加的区块号是最后更改该值的区块号
     struct Checkpoint {
 
         // `fromBlock` is the block number that the value was generated from
@@ -1278,6 +1288,7 @@ contract MiniMeToken is Controlled {
 
     // `parentSnapShotBlock` is the block number from the Parent Token that was
     //  used to determine the initial distribution of the Clone Token
+    // parentSnapShotBlock是来自父代币的区块号，用于确定克隆代币的初始分布
     uint public parentSnapShotBlock;
 
     // `creationBlock` is the block number that the Clone Token was created
@@ -1286,12 +1297,14 @@ contract MiniMeToken is Controlled {
     // `balances` is the map that tracks the balance of each address, in this
     //  contract when the balance changes the block number that the change
     //  occurred is also included in the map
+    // balances是跟踪每个地址余额的map，在本合约中，当余额发生变化时，发生变化的区块号也包括在map中
     mapping (address => Checkpoint[]) balances;
 
     // `allowed` tracks any extra transfer rights as in all ERC20 tokens
     mapping (address => mapping (address => uint256)) allowed;
 
     // Tracks the history of the `totalSupply` of the token
+    // 跟踪代币totalSupply的历史记录
     Checkpoint[] totalSupplyHistory;
 
     // Flag that determines if the token is transferable or not.
@@ -1487,7 +1500,7 @@ contract MiniMeToken is Controlled {
     /// @param _owner The address from which the balance will be retrieved
     /// @param _blockNumber The block number when the balance is queried
     /// @return The balance at `_blockNumber`
-    function balanceOfAt(address _owner, uint _blockNumber) public constant returns (uint) {
+    function balanceOfAt(address _owner, uint _blockNumber) public constant returns (uint) {//TODO
 
         // These next few lines are used when the balance of the token is
         //  requested before a check point was ever created for this token, it
@@ -1503,6 +1516,7 @@ contract MiniMeToken is Controlled {
             }
 
         // This will return the expected balance during normal situations
+        // 正常情况走这个分支
         } else {
             return getValueAt(balances[_owner], _blockNumber);
         }
@@ -1511,6 +1525,9 @@ contract MiniMeToken is Controlled {
     /// @notice Total amount of tokens at a specific `_blockNumber`.
     /// @param _blockNumber The block number when the totalSupply is queried
     /// @return The total amount of tokens at `_blockNumber`
+    /// @notice 特定' _blockNumber '的token总数。
+    /// @param _blockNumber 查询totalSupply时的区块号
+    /// @return 在' _blockNumber '的token总数
     function totalSupplyAt(uint _blockNumber) public constant returns(uint) {
 
         // These next few lines are used when the totalSupply of the token is
@@ -1518,15 +1535,22 @@ contract MiniMeToken is Controlled {
         //  requires that the `parentToken.totalSupplyAt` be queried at the
         //  genesis block for this token as that contains totalSupply of this
         //  token at this block number.
+        // 接下来的几行用于在为代币创建检查点之前请求代币的totalSupply时，它需要在这个代币的创世区块上查询`parentToken.totalSupplyAt`，因为它包含了这个代币在这个区块号上的totalSupply。
+        // totalSupplyHistory跟踪代币totalSupply的历史记录
+        // totalSupplyHistory.length == 0)说明根本没有totalSupply的历史记录
+        // totalSupplyHistory[0].fromBlock > _blockNumber)：打个比方，totalSupplyHistory是从第100个区块开始记录totalSupply的，但要查询的是第50个区块，那肯定没有记录
         if ((totalSupplyHistory.length == 0) || (totalSupplyHistory[0].fromBlock > _blockNumber)) {
-            if (address(parentToken) != 0) {
+            if (address(parentToken) != 0) { // 如果parentToken地址不为0,即已经部署了
+                // parentSnapShotBlock是来自父代币的区块号，用于确定克隆代币的初始分布
                 return parentToken.totalSupplyAt(min(_blockNumber, parentSnapShotBlock));
             } else {
                 return 0;
             }
 
         // This will return the expected totalSupply during normal situations
+        // 正常情况下，应该走这个分支
         } else {
+            // 返回指定区块号对应的代币数量
             return getValueAt(totalSupplyHistory, _blockNumber);
         }
     }
@@ -1625,6 +1649,10 @@ contract MiniMeToken is Controlled {
     /// @param checkpoints The history of values being queried
     /// @param _block The block number to retrieve the value at
     /// @return The number of tokens being queried
+    /// @dev getValueAt获取给定区块号的代币数量
+    /// @param checkpoints 正在查询的值的历史记录
+    /// @param _block 获取值的区块号
+    /// @return 返回区块号对应的代币数量
     function getValueAt(Checkpoint[] storage checkpoints, uint _block) constant internal returns (uint) {
         if (checkpoints.length == 0)
             return 0;
@@ -1783,6 +1811,7 @@ contract Voting is IForwarder, AragonApp {
     bytes32 public constant SET_MIN_BALANCE_ROLE = keccak256("SET_MIN_BALANCE_ROLE"); //keccak256("SET_MIN_BALANCE_ROLE")
     bytes32 public constant SET_MIN_TIME_ROLE = keccak256("SET_MIN_TIME_ROLE"); //keccak256("SET_MIN_TIME_ROLE")
 
+    // 表示1,即百分之百
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
     string private constant ERROR_NO_VOTE = "VOTING_NO_VOTE";
@@ -1811,14 +1840,14 @@ contract Voting is IForwarder, AragonApp {
         mapping (address => VoterState) voters;
     }
 
-    MiniMeToken public token;
+    MiniMeToken public token; // veCRV token
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
     uint64 public voteTime;
 
-    uint256 public minBalanceLowerLimit = 2500000000000000000000;
-    uint256 public minTimeLowerLimit = 43200;
-    uint256 public minTimeUpperLimit = 1209600;
+    uint256 public minBalanceLowerLimit = 2500000000000000000000; // 至少需要2500个veCRV才能投票
+    uint256 public minTimeLowerLimit = 43200; //43200 即12小时
+    uint256 public minTimeUpperLimit = 1209600; //1209600 即14天，两周
 
     uint256 public minBalance;
     uint256 public minTime;
@@ -1838,6 +1867,7 @@ contract Voting is IForwarder, AragonApp {
     event MinimumBalanceSet(uint256 minBalance);
     event MinimumTimeSet(uint256 minTime);
 
+    // 根据voteid判断一个vote是否存在，voteid从0开始递增，0,1,2,3...
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
         _;
@@ -1845,11 +1875,13 @@ contract Voting is IForwarder, AragonApp {
 
     modifier minBalanceCheck(uint256 _minBalance) {
         //_minBalance to be at least the equivalent of 10k locked for a year (1e18 precision)
+        // minBalance应在初始化hardcode的上下阈值内
         require(_minBalance >= minBalanceLowerLimit, "Not enough min balance");
         _;
     }
 
     modifier minTimeCheck(uint256 _minTime) {
+        // minTime应在初始化hardcode的上下阈值内
         require(_minTime >= minTimeLowerLimit && _minTime <= minTimeUpperLimit, "Min time can't be less than half a day and more than 2 weeks");
         _;
     }
@@ -1861,6 +1893,18 @@ contract Voting is IForwarder, AragonApp {
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _voteTime Seconds that a vote will be open for token holders to vote (unless enough yeas or nays have been cast to make an early decision)
     */
+    /**
+    * @notice 初始化投票应用程序，使用`_token.symbol(): string`来治理，最低支持`@formatPct(_supportRequiredPct)`%，最低接受quorum`@formatPct(_minAcceptQuorumPct)`%，投票持续时间`@transformTime(_voteTime)`
+    * @param _token 将用作治理代币的MiniMeToken地址
+    * @param _supportRequiredPct 投票成功的百分比，即在已投票数中，投赞成票的比例，大于等于这个比例，投票就通过(表示为10^18的百分比;如。10^16 = 1%， 10^18 = 100%)
+    * @param _minAcceptQuorumPct 投票成功的quorum，即在所有可能的票数中（包含投了的和没投的），投赞成票的比例，必须大于等于这个比例，投票才有可能通过(表示为10^18的百分比;如。10^16 = 1%， 10^18 = 100%)
+    * @param _voteTime 投票将向代币持有者开放投票的秒数(除非有足够多的赞成票或反对票来提前做出决定)
+    * @param _minBalance 代币持有者创建一个新投票所需的最小余额
+    * @param _minTime 用户上次创建投票和创建新投票之间的最短时间
+    * @param _minBalanceLowerLimit _minBalance的下限
+    * @param _minTimeLowerLimit _minTime的下限
+    * @param _minTimeUpperLimit _minTime的上限
+    */
     function initialize(MiniMeToken _token, 
         uint64 _supportRequiredPct, 
         uint64 _minAcceptQuorumPct, 
@@ -1871,9 +1915,12 @@ contract Voting is IForwarder, AragonApp {
         uint256 _minTimeLowerLimit,
         uint256 _minTimeUpperLimit
     ) external onlyInit {
+        // 初始化初始区块号
         initialized();
 
+        // _supportRequiredPct指“赞成票数/已投票数”，_minAcceptQuorumPct指“赞成票数/(已投票数+未投票数)”
         require(_minAcceptQuorumPct <= _supportRequiredPct, ERROR_INIT_PCTS);
+        // 小于100%
         require(_supportRequiredPct < PCT_BASE, ERROR_INIT_SUPPORT_TOO_BIG);
 
         token = _token;
@@ -1950,9 +1997,19 @@ contract Voting is IForwarder, AragonApp {
     * @param _executesIfDecided Whether to also immediately execute newly created vote if decided
     * @return voteId id for newly created vote
     */
-    function newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)
+    /**
+
+    * @notice 创建关于“_metadata”的新投票
+    * @param _executionScript 投票通过后要执行的EVM脚本
+    * @param _metadata 新投票的元数据
+    * @param _castVote 是否对新创建的投票投赞成票
+    * @param _executesifdecide 是否也立即执行新创建的投票，如果决定
+    * @return voteId 新创建的投票的id
+
+    */
+    function newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)//TODO
         external
-        auth(CREATE_VOTES_ROLE)
+        auth(CREATE_VOTES_ROLE) // 判断是否有CREATE_VOTES_ROLE角色
         returns (uint256 voteId)
     {
         return _newVote(_executionScript, _metadata, _castVote, _executesIfDecided);
@@ -2036,6 +2093,8 @@ contract Voting is IForwarder, AragonApp {
     }
 
     function canCreateNewVote() public returns(bool) {
+        // msg.sender必须满足两个条件才能创建新的投票：
+        // 1.拥有的veCRV余额至少是minBalance 2.距离自己上一次创建新投票的时间大于等于minTime
         return token.balanceOf(msg.sender) >= minBalance &&  block.timestamp.sub(minTime) >= lastCreateVoteTimes[msg.sender];
     }
 
@@ -2100,26 +2159,35 @@ contract Voting is IForwarder, AragonApp {
     * @return voteId id for newly created vote
     */
     function _newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided) internal returns (uint256 voteId) {
+        // msg.sender必须满足两个条件才能创建新的投票：
+        // 1.拥有的veCRV余额至少是minBalance 2.距离自己上一次创建新投票的时间大于等于minTime
         require(canCreateNewVote());
+        // 获取上一个区块的区块号
+        // getBlockNumber64返回当前区块号，并转换为uint64类型。
+        // TODO：这里为什么要获取上一个区块号，还需要深入调查
         uint64 snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
+        // 上一个区块时的token总数，代表总的voting power
         uint256 votingPower = token.totalSupplyAt(snapshotBlock);
+        // voting power必须大于0
         require(votingPower > 0, ERROR_NO_VOTING_POWER);
 
-        voteId = votesLength++;
+        voteId = votesLength++; // votesLength初始值为0,第一个创建的投票的vote id就是1，然后顺序递增
 
         Vote storage vote_ = votes[voteId];
-        vote_.startDate = getTimestamp64();
-        vote_.snapshotBlock = snapshotBlock;
+        vote_.startDate = getTimestamp64(); // 投票的开始时间为当前区块时间戳
+        vote_.snapshotBlock = snapshotBlock; // 上一个区块
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
-        vote_.votingPower = votingPower;
-        vote_.executionScript = _executionScript;
+        vote_.votingPower = votingPower; // 本次投票的总的voting power为上一个区块的总的voting power
+        vote_.executionScript = _executionScript; // 投票通过后需要执行的脚本
 
         emit StartVote(voteId, msg.sender, _metadata);
 
+        // 把msg.sender本次创建投票的时间戳记录下来
         lastCreateVoteTimes[msg.sender] = getTimestamp64();
 
         if (_castVote && _canVote(voteId, msg.sender)) {
+            // 投票只有两种：赞成和反对。此处是投赞成票。
             _vote(voteId, true, msg.sender, _executesIfDecided);
         }
     }
@@ -2128,31 +2196,39 @@ contract Voting is IForwarder, AragonApp {
     * @dev Internal function to cast a vote. It assumes the queried vote exists.
     */
     function _vote(uint256 _voteId, bool _supports, address _voter, bool _executesIfDecided) internal {
+        // Vote有一个属性：mapping (address => VoterState) voters;
         Vote storage vote_ = votes[_voteId];
 
+        // 某一个voter对应的投票状态，只有三种状态：Absent, Yea, Nay
         VoterState state = vote_.voters[_voter];
-        require(state == VoterState.Absent, "Can't change votes");
+        require(state == VoterState.Absent, "Can't change votes"); // 默认是Absent状态，即还没有开始投
         // This could re-enter, though we can assume the governance token is not malicious
+        // 获取voter在上一个区块的veCRV余额，即voter的voting power
         uint256 balance = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        // 2*veCRV余额*(投票开始时间戳+投票持续时间-当前时间戳)/投票持续时间 = 2*veCRV余额*离投票结束还剩的时间/投票持续时间 = 2*veCRV余额*离投票结束还剩的时间占总的投票持续时间的比例
+        // 同样的voting power，离投票结束时间越近，voterStake越小；离投票结束时间越远，voterStake越大，但不能超过voting power
+        // 这个机制就是用于鼓励投票人早点投票，而不要拖到最后才投票，越拖，投票权重越低
         uint256 voterStake = uint256(2).mul(balance).mul(vote_.startDate.add(voteTime).sub(getTimestamp64())).div(voteTime);
         if(voterStake > balance) {
             voterStake = balance;
         }
 
-        if (_supports) {
+        if (_supports) { // 赞成票
             vote_.yea = vote_.yea.add(voterStake);
-        } else {
+        } else { // 反对票
             vote_.nay = vote_.nay.add(voterStake);
         }
 
-        vote_.voters[_voter] = _supports ? VoterState.Yea : VoterState.Nay;
+        vote_.voters[_voter] = _supports ? VoterState.Yea : VoterState.Nay; // 记录投票者是投的赞成票还是反对票
 
-        emit CastVote(_voteId, _voter, _supports, voterStake);
+        emit CastVote(_voteId, _voter, _supports, voterStake); // 记录vote id，投票者，投票选项，投票权重
 
+        // 如果满足各项投票执行需要的条件，就执行脚本
         if (_executesIfDecided && _canExecute(_voteId)) {
             // We've already checked if the vote can be executed with `_canExecute()`
             _unsafeExecuteVote(_voteId);
         }
+        // 可以看到，投票方法并不会对投票人的veCRV余额有什么影响，不会造成余额变化。这意味着同一个投票人，可以用自己的voting power对多个proposal进行投票。
     }
 
     /**
@@ -2166,13 +2242,14 @@ contract Voting is IForwarder, AragonApp {
     /**
     * @dev Unsafe version of _executeVote that assumes you have already checked if the vote can be executed and exists
     */
+    // _executeVote的不安全版本，假定您已经检查了投票是否可以执行并且存在
     function _unsafeExecuteVote(uint256 _voteId) internal {
         Vote storage vote_ = votes[_voteId];
 
-        vote_.executed = true;
+        vote_.executed = true; // 把脚本执行状态设置为true，避免重复执行
 
         bytes memory input = new bytes(0); // TODO: Consider input for voting scripts
-        runScript(vote_.executionScript, input, new address[](0));
+        runScript(vote_.executionScript, input, new address[](0)); // 执行脚本
 
         emit ExecuteVote(_voteId);
     }

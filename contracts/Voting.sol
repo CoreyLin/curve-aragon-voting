@@ -30,6 +30,7 @@ contract Voting is IForwarder, AragonApp {
 
     bytes32 public constant DISABLE_VOTE_CREATION = 0x40b01f8b31b51596de2eeab8c325ff77cc3695c1c1875d66ff31176e7148d2a1; //keccack256("DISABLE_VOTE_CREATION")
 
+    // 表示1,即百分之百
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
     string private constant ERROR_NO_VOTE = "VOTING_NO_VOTE";
@@ -59,17 +60,17 @@ contract Voting is IForwarder, AragonApp {
         mapping (address => VoterState) voters;
     }
 
-    MiniMeToken public token;
+    MiniMeToken public token; // veCRV token
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
     uint64 public voteTime;
 
     //2500000000000000000000
-    uint256 public minBalanceLowerLimit;
+    uint256 public minBalanceLowerLimit; // 至少需要2500个veCRV才能投票
     uint256 public minBalanceUpperLimit;
-    //43200
+    //43200 即12小时
     uint256 public minTimeLowerLimit;
-    //1209600
+    //1209600 即14天，两周
     uint256 public minTimeUpperLimit;
 
     uint256 public minBalance;
@@ -92,6 +93,7 @@ contract Voting is IForwarder, AragonApp {
     event MinimumBalanceSet(uint256 minBalance);
     event MinimumTimeSet(uint256 minTime);
 
+    // 根据voteid判断一个vote是否存在，voteid从0开始递增，0,1,2,3...
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
         _;
@@ -99,11 +101,13 @@ contract Voting is IForwarder, AragonApp {
 
     modifier minBalanceCheck(uint256 _minBalance) {
         //_minBalance to be at least the equivalent of 10k locked for a year (1e18 precision)
+        // minBalance应在初始化hardcode的上下阈值内
         require(_minBalance >= minBalanceLowerLimit && _minBalance <= minBalanceUpperLimit, "Min balance should be within initialization hardcoded limits");
         _;
     }
 
     modifier minTimeCheck(uint256 _minTime) {
+        // minTime应在初始化hardcode的上下阈值内
         require(_minTime >= minTimeLowerLimit && _minTime <= minTimeUpperLimit, "Min time should be within initialization hardcoded limits");
         _;
     }
@@ -120,7 +124,19 @@ contract Voting is IForwarder, AragonApp {
     * @param _minTimeLowerLimit Hardcoded lower limit for _minTime on initialization
     * @param _minTimeUpperLimit Hardcoded upper limit for _minTime on initialization
     */
-    function initialize(MiniMeToken _token, 
+    /**
+    * @notice 初始化投票应用程序，使用`_token.symbol(): string`来治理，最低支持`@formatPct(_supportRequiredPct)`%，最低接受quorum`@formatPct(_minAcceptQuorumPct)`%，投票持续时间`@transformTime(_voteTime)`
+    * @param _token 将用作治理代币的MiniMeToken地址
+    * @param _supportRequiredPct 投票成功的百分比，即在已投票数中，投赞成票的比例，大于等于这个比例，投票就通过(表示为10^18的百分比;如。10^16 = 1%， 10^18 = 100%)
+    * @param _minAcceptQuorumPct 投票成功的quorum，即在所有可能的票数中（包含投了的和没投的），投赞成票的比例，必须大于等于这个比例，投票才有可能通过(表示为10^18的百分比;如。10^16 = 1%， 10^18 = 100%)
+    * @param _voteTime 投票将向代币持有者开放投票的秒数(除非有足够多的赞成票或反对票来提前做出决定)
+    * @param _minBalance 代币持有者创建一个新投票所需的最小余额
+    * @param _minTime 用户上次创建投票和创建新投票之间的最短时间
+    * @param _minBalanceLowerLimit _minBalance的下限
+    * @param _minTimeLowerLimit _minTime的下限
+    * @param _minTimeUpperLimit _minTime的上限
+     */
+    function initialize(MiniMeToken _token,
         uint64 _supportRequiredPct, 
         uint64 _minAcceptQuorumPct, 
         uint64 _voteTime,
